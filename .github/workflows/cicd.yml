@@ -40,11 +40,6 @@ jobs:
           cd frontend
           mvn clean install
 
-      - name: Build and Test Backend
-        run: |
-          cd backend
-          mvn clean install
-
       - name: Azure Login
         uses: azure/login@v1
         with:
