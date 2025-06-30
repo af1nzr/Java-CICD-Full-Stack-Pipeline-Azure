@@ -1,0 +1,15 @@
+3-tier-docker-app-Actions/
+├── .github/
+│   └── workflows/
+│       └── cicd.yml              <-- GitHub Actions CI/CD
+├── frontend/
+│   ├── Dockerfile
+│   └── index.html
+├── backend/
+│   ├── app.py
+│   ├── requirements.txt
+│   └── Dockerfile
+├── db/
+│   └── Dockerfile
+├── docker-compose.yml
+└── README.md

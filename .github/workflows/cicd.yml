@@ -1,0 +1,123 @@
+name: Java-CICD-Full-Stack-Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  RESOURCE_GROUP_NAME: "JavaCICDPipeline-RG"
+  LOCATION: "East US"
+
+  ACR_NAME: "javacicdpipelineafn"
+  ACR_LOGIN_SERVER: javacicdpipelineafn.azurecr.io
+  ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+  ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+
+  FRONTEND_IMAGE_NAME: "java-cicd-pipeline_frontend"
+  BACKEND_IMAGE_NAME: "java-cicd-pipeline_backend"
+  DB_IMAGE_NAME: "java-cicd-pipeline_db"
+
+  ACI_FRONTEND_NAME: "javacicdpipelineafnfrontendaci"
+  ACI_BACKEND_NAME: "javacicdpipelineafnbackendaci"
+  ACI_DB_NAME: "javacicdpipelineafndbaci"
+
+jobs:
+  build_test_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Set up Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Build and Test Frontend
+        run: |
+          cd frontend
+          mvn clean install
+
+      - name: Build and Test Backend
+        run: |
+          cd backend
+          mvn clean install
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Docker Login to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build Docker Images
+        run: |
+          docker build -t $ACR_LOGIN_SERVER/${{ env.FRONTEND_IMAGE_NAME }}:latest ./frontend
+          docker build -t $ACR_LOGIN_SERVER/${{ env.BACKEND_IMAGE_NAME }}:latest ./backend
+          docker build -t $ACR_LOGIN_SERVER/${{ env.DB_IMAGE_NAME }}:latest ./db
+
+      - name: Scan Docker Images with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ACR_LOGIN_SERVER }}/${{ env.FRONTEND_IMAGE_NAME }}:latest
+          format: 'table'
+
+      - name: Push Docker Images to ACR
+        run: |
+          docker push $ACR_LOGIN_SERVER/${{ env.FRONTEND_IMAGE_NAME }}:latest
+          docker push $ACR_LOGIN_SERVER/${{ env.BACKEND_IMAGE_NAME }}:latest
+          docker push $ACR_LOGIN_SERVER/${{ env.DB_IMAGE_NAME }}:latest
+
+      - name: Deploy Frontend to ACI
+        run: |
+          az container create \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --name $ACI_FRONTEND_NAME \
+            --image $ACR_LOGIN_SERVER/${{ env.FRONTEND_IMAGE_NAME }}:latest \
+            --cpu 1 --memory 1 \
+            --registry-login-server $ACR_LOGIN_SERVER \
+            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-password ${{ secrets.ACR_PASSWORD }} \
+            --dns-name-label frontend-${{ github.run_number }} \
+            --ports 80 \
+            --os-type Linux
+
+      - name: Deploy Backend to ACI
+        run: |
+          az container create \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --name $ACI_BACKEND_NAME \
+            --image $ACR_LOGIN_SERVER/${{ env.BACKEND_IMAGE_NAME }}:latest \
+            --cpu 1 --memory 1 \
+            --registry-login-server $ACR_LOGIN_SERVER \
+            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-password ${{ secrets.ACR_PASSWORD }} \
+            --dns-name-label backend-${{ github.run_number }} \
+            --ports 5000 \
+            --os-type Linux
+
+      - name: Deploy MySQL to ACI
+        run: |
+          az container create \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --name $ACI_DB_NAME \
+            --image $ACR_LOGIN_SERVER/${{ env.DB_IMAGE_NAME }}:latest \
+            --cpu 1 --memory 1 \
+            --registry-login-server $ACR_LOGIN_SERVER \
+            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-password ${{ secrets.ACR_PASSWORD }} \
+            --dns-name-label mysql-${{ github.run_number }} \
+            --ports 3306 \
+            --os-type Linux \
+            --environment-variables \
+              MYSQL_ROOT_PASSWORD=123456 \
+              MYSQL_DATABASE=appdb \
+              MYSQL_USER=admin \
+              MYSQL_PASSWORD=password

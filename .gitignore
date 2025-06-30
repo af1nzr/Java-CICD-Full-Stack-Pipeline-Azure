@@ -1,0 +1,46 @@
+# Java
+*.class
+*.jar
+*.war
+*.ear
+/target/
+
+# Maven
+/logs/
+*.log
+*.iml
+.idea/
+*.ipr
+*.iws
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+ENV/
+build/
+dist/
+.eggs/
+*.egg-info/
+
+# Docker
+*.pid
+*.seed
+*.swp
+.dockerignore
+Dockerfile*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.bak
+*.tmp
+*.swp
+
+# VSCode
+.vscode/ 
