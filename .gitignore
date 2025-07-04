@@ -31,7 +31,6 @@ dist/
 *.seed
 *.swp
 .dockerignore
-Dockerfile*
 
 # OS
 .DS_Store
